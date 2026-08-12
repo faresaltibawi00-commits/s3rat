@@ -42,6 +42,8 @@ if "current_user" not in st.session_state:
     st.session_state["current_user"] = None
 if "active_meal_type" not in st.session_state:
     st.session_state["active_meal_type"] = None
+if "scanned_meal_result" not in st.session_state:
+    st.session_state["scanned_meal_result"] = None
 
 # 5. التنسيق والتصميم (MyFitnessPal Style)
 st.markdown("""
@@ -259,6 +261,7 @@ else:
             if st.button("خروج 🚪"):
                 st.session_state["logged_in"] = False
                 st.session_state["current_user"] = None
+                st.session_state["scanned_meal_result"] = None
                 st.rerun()
 
         st.markdown("""
@@ -283,6 +286,7 @@ else:
             if st.button("🗑️ تصفير سعرات اليوم"):
                 users_db[user_key]["eaten"] = {"cals": 0, "protein": 0, "carbs": 0, "fats": 0}
                 save_users(users_db)
+                st.session_state["scanned_meal_result"] = None
                 st.rerun()
 
         target_cals = prof["target_cals"]
@@ -365,26 +369,25 @@ else:
                     st.success(f"تمت إضافة الوجبة إلى {meal_type}!")
                     st.rerun()
 
-        # --- 5. ماسح الوجبة بالذكاء الاصطناعي ---
+        # --- 5. ماسح الوجبة بالذكاء الاصطناعي مع العرض أولاً قبل الإضافة ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:20px;">📸 مسح وتصوير الوجبة بالذكاء الاصطناعي</h3>', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader("التقط صورة الوجبة لتحديث العداد تلقائياً:", type=["jpg", "jpeg", "png"])
+        uploaded_file = st.file_uploader("التقط صورة الوجبة لاستخراج السعرات ثم معاينتها:", type=["jpg", "jpeg", "png"])
         
         if uploaded_file is not None:
             image_bytes = uploaded_file.read()
             st.image(image_bytes, caption="الوجبة المرفوعة", use_container_width=True)
             
-            if st.button("⚡ تحليل وتسجيل الوجبة بالصورة", use_container_width=True):
+            if st.button("⚡ تحليل الوجبة بالصورة", use_container_width=True):
                 if not API_KEY:
                     st.error("⚠️ يرجى ضبط GROQ_API_KEY في Secrets.")
                 else:
-                    with st.spinner("جاري تحليل الصورة واستخراج السعرات... ⚡"):
+                    with st.spinner("جاري تحليل الصورة وحساب السعرات... ⚡"):
                         try:
                             client = Groq(api_key=API_KEY)
                             base64_image = encode_image(image_bytes)
 
                             prompt_instruction = """
                             Analyze the food item in the image. You MUST respond strictly with a raw JSON object and nothing else.
-                            
                             Format:
                             {
                                 "meal_name": "اسم الوجبة بالعربي",
@@ -395,7 +398,6 @@ else:
                             }
                             """
 
-                            # الموديل المعتمد حالياً للصور في Groq
                             response = client.chat.completions.create(
                                 model="qwen/qwen3.6-27b",
                                 messages=[
@@ -420,22 +422,54 @@ else:
 
                             data = json.loads(res_text)
                             
-                            c_add = int(data.get("calories", 0))
-                            p_add = int(data.get("protein", 0))
-                            carb_add = int(data.get("carbs", 0))
-                            f_add = int(data.get("fats", 0))
-
-                            users_db[user_key]["eaten"]["cals"] += c_add
-                            users_db[user_key]["eaten"]["protein"] += p_add
-                            users_db[user_key]["eaten"]["carbs"] += carb_add
-                            users_db[user_key]["eaten"]["fats"] += f_add
-                            save_users(users_db)
-
-                            st.success(f"تم التعرف على {data.get('meal_name', 'الوجبة')} وإضافة (+{c_add} سعرة حرارية) بنجاح! 🎉")
-                            st.rerun()
+                            # حفظ النتيجة في الجلسة للمعاينة قبل الإضافة
+                            st.session_state["scanned_meal_result"] = {
+                                "meal_name": data.get("meal_name", "وجبة مصورة"),
+                                "calories": int(data.get("calories", 0)),
+                                "protein": int(data.get("protein", 0)),
+                                "carbs": int(data.get("carbs", 0)),
+                                "fats": int(data.get("fats", 0))
+                            }
 
                         except Exception:
+                            st.session_state["scanned_meal_result"] = None
                             st.error("يرجى التصوير بشكل واضح")
+
+        # --- كرت المعاينة قبل الإضافة الفعليه ---
+        if st.session_state["scanned_meal_result"]:
+            res = st.session_state["scanned_meal_result"]
+            st.markdown("---")
+            st.markdown(f"""
+                <div class="mfp-card" style="border: 2px solid #38ef7d; background-color: #162030;">
+                    <h4 style="color:#38ef7d; margin-top:0;">🔍 نتيجة تحليل الوجبة (قبل الإضافة)</h4>
+                    <p style="font-size:18px; font-weight:bold; color:#ffffff;">الوجبة: {res['meal_name']}</p>
+                    <div style="display:flex; justify-size:space-around; gap:15px; background:#1e293b; padding:12px; border-radius:12px; text-align:center;">
+                        <div>🔥 السعرات: <b style="color:#38ef7d;">{res['calories']}</b> kcal</div>
+                        <div>🥩 بروتين: <b>{res['protein']}</b>g</div>
+                        <div>🍞 كارب: <b>{res['carbs']}</b>g</div>
+                        <div>🥑 دهون: <b>{res['fats']}</b>g</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            target_meal = st.selectbox("حدد الوجبة المراد إضافتها إليها:", ["وجبة الإفطار", "وجبة الغداء", "وجبة العشاء"])
+            
+            col_act1, col_act2 = st.columns(2)
+            with col_act1:
+                if st.button("تأكيد وإضافة للجدول 🎯", use_container_width=True):
+                    users_db[user_key]["eaten"]["cals"] += res["calories"]
+                    users_db[user_key]["eaten"]["protein"] += res["protein"]
+                    users_db[user_key]["eaten"]["carbs"] += res["carbs"]
+                    users_db[user_key]["eaten"]["fats"] += res["fats"]
+                    save_users(users_db)
+                    
+                    st.session_state["scanned_meal_result"] = None
+                    st.success(f"تمت إضافة {res['meal_name']} ({res['calories']} سعرة) إلى {target_meal} بنجاح! 🎉")
+                    st.rerun()
+            with col_act2:
+                if st.button("إلغاء ❌", use_container_width=True):
+                    st.session_state["scanned_meal_result"] = None
+                    st.rerun()
 
         # --- 6. المساعد التغذوي الذكي ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:25px;">💬 المساعد التغذوي الذكي</h3>', unsafe_allow_html=True)
