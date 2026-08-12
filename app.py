@@ -1,5 +1,5 @@
 import streamlit as st
-from google import genai
+import google.generativeai as genai
 from PIL import Image
 
 # 1. إعدادات الصفحة
@@ -10,20 +10,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. جلب المفتاح تلقائياً من إعدادات Streamlit السريّة (Secrets)
-try:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-except Exception:
-    API_KEY = None
+# 2. جلب المفتاح وإعداد موديل الذكاء الاصطناعي
+API_KEY = None
+if "GEMINI_API_KEY" in st.secrets:
+    API_KEY = str(st.secrets["GEMINI_API_KEY"]).strip()
+    genai.configure(api_key=API_KEY)
 
-# 3. إدارة جلسة المستخدم والحسابات المحفوظة
+# 3. إدارة جلسة المستخدم
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
 if "users_db" not in st.session_state:
     st.session_state["users_db"] = {"user": "1234"}
 
-# 4. تحسين المظهر وإخفاء القائمة الجانبية تماماً
+# 4. التنسيق والمظهر
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -34,15 +34,9 @@ st.markdown("""
         text-align: right;
     }
 
-    /* إخفاء القائمة الجانبية وزر الفتح نهائياً */
-    [data-testid="stSidebar"] {
-        display: none !important;
-    }
-    [data-testid="collapsedControl"] {
-        display: none !important;
-    }
+    [data-testid="stSidebar"] { display: none !important; }
+    [data-testid="collapsedControl"] { display: none !important; }
     
-    /* الشريط المخصص لشاشة الدخول */
     .hero-banner {
         background: linear-gradient(135deg, #0ba360 0%, #3cba92 100%);
         padding: 35px 20px;
@@ -50,14 +44,8 @@ st.markdown("""
         color: white;
         text-align: center;
         margin-bottom: 25px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
-    .hero-banner h1 {
-        color: white !important;
-        font-size: 36px;
-        font-weight: 700;
-        margin: 0;
-    }
+    .hero-banner h1 { color: white !important; font-size: 36px; margin: 0; }
     .hero-banner .sub-title {
         font-size: 20px;
         font-weight: bold;
@@ -68,7 +56,6 @@ st.markdown("""
         margin-top: 12px;
     }
     
-    /* هيدر التطبيق الرئيسي */
     .main-header {
         background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         padding: 20px;
@@ -77,11 +64,7 @@ st.markdown("""
         text-align: center;
         margin-bottom: 25px;
     }
-    .main-header h1 {
-        color: white !important;
-        font-size: 28px;
-        margin: 0;
-    }
+    .main-header h1 { color: white !important; font-size: 28px; margin: 0; }
     
     .metric-card {
         background-color: #f8f9fa;
@@ -91,19 +74,12 @@ st.markdown("""
         border: 1px solid #e9ecef;
         margin-bottom: 10px;
     }
-    .metric-value {
-        font-size: 22px;
-        font-weight: bold;
-        color: #11998e;
-    }
-    .metric-label {
-        font-size: 13px;
-        color: #6c757d;
-    }
+    .metric-value { font-size: 22px; font-weight: bold; color: #11998e; }
+    .metric-label { font-size: 13px; color: #6c757d; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- شاشة التسجيل / الدخول (قبل الدخول) ---
+# --- شاشة الدخول والتسجيل ---
 if not st.session_state["logged_in"]:
     st.markdown("""
         <div class="hero-banner">
@@ -116,7 +92,6 @@ if not st.session_state["logged_in"]:
     with col2:
         tab_login, tab_signup = st.tabs(["🔐 تسجيل الدخول", "✨ إنشاء حساب جديد"])
         
-        # --- تبويب تسجيل الدخول ---
         with tab_login:
             st.write(" ")
             login_user = st.text_input("اسم المستخدم:", key="login_u")
@@ -130,7 +105,6 @@ if not st.session_state["logged_in"]:
                 else:
                     st.error("اسم المستخدم أو كلمة المرور غير صحيحة!")
 
-        # --- تبويب إنشاء حساب جديد ---
         with tab_signup:
             st.write(" ")
             new_user = st.text_input("اختر اسم المستخدم:", key="signup_u")
@@ -141,7 +115,7 @@ if not st.session_state["logged_in"]:
                 if not new_user or not new_pass:
                     st.warning("يرجى ملء جميع الحقول!")
                 elif new_user in st.session_state["users_db"]:
-                    st.error("اسم المستخدم هذا مستخدم بالفعل، اختر اسماً آخر.")
+                    st.error("اسم المستخدم هذا مستخدم بالفعل!")
                 elif new_pass != confirm_pass:
                     st.error("كلمتا المرور غير متطابقتين!")
                 else:
@@ -152,7 +126,6 @@ if not st.session_state["logged_in"]:
 
 else:
     # --- التطبيق الرئيسي ---
-    # إضافة زر خروج في أعلى الصفحة بدلاً من القائمة الجانبية
     col_h1, col_h2 = st.columns([5, 1])
     with col_h2:
         if st.button("تسجيل الخروج 🚪"):
@@ -223,27 +196,14 @@ else:
                 st.error("⚠️ لم يتم ضبط مفتاح Gemini API Key في Streamlit Secrets.")
             else:
                 with st.spinner("جاري تحليل الوجبة... ⏳"):
-                    client = genai.Client(api_key=API_KEY)
-                    prompt = """
-                    أنت أخصائي تغذية خبير ومحترف جداً. قم بتحليل الوجبة في الصورة بدقة عالية باللغة العربية:
-                    
-                    1. 🍽️ **اسم الوجبة والمكونات المفصلة:** (قدر أوزان المكونات بالجرام بشكل دقيق ومحسب).
-                    2. 📊 **الماكروز والسعرات الحرارية الدقيقة:**
-                       - السعرات الحرارية الإجمالية:
-                       - البروتين (غرام):
-                       - الكربوهيدرات (غرام):
-                       - الدهون (غرام):
-                    3. 💡 **تقييم صحي ونصيحة للوجبة.**
-                    """
                     try:
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=[prompt, image]
-                        )
+                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        prompt = "أنت أخصائي تغذية خبير ومحترف. قم بتحليل الوجبة في الصورة بدقة باللغة العربية واذكر السعرات والماكروز والتفاصيل."
+                        response = model.generate_content([prompt, image])
                         st.success("تم التحليل بنجاح! 🎉")
                         st.markdown(response.text)
                     except Exception as e:
-                        st.error(f"حدث خطأ: {e}")
+                        st.error(f"حدث خطأ أثناء التحليل: {e}")
 
     st.markdown("---")
 
@@ -256,11 +216,9 @@ else:
         else:
             with st.spinner("جاري الإجابة..."):
                 try:
-                    client = genai.Client(api_key=API_KEY)
-                    chat_response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=f"أجب كأخصائي تغذية بأسلوب مشجع ومختصر باللغة العربية: {user_question}"
-                    )
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    chat_prompt = f"أجب كأخصائي تغذية بأسلوب مشجع ومختصر باللغة العربية على السؤال التالي: {user_question}"
+                    chat_response = model.generate_content(chat_prompt)
                     st.info(chat_response.text)
                 except Exception as e:
                     st.error(f"حدث خطأ: {e}")
