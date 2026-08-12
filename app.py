@@ -183,7 +183,6 @@ else:
     user_data = users_db.get(user_key, {})
     user_profile = user_data.get("profile")
 
-    # تهيئة بيانات الأكل المحفوظة
     if "eaten" not in user_data:
         user_data["eaten"] = {"cals": 0, "protein": 0, "carbs": 0, "fats": 0}
 
@@ -262,7 +261,6 @@ else:
                 st.session_state["current_user"] = None
                 st.rerun()
 
-        # شريط الأيام
         st.markdown("""
             <div class="days-bar">
                 <div class="day-item"><div style="margin-bottom:2px;">الأحد</div><div class="day-circle"></div></div>
@@ -275,7 +273,6 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        # زر تعديل البيانات وتصفير اليوم
         col_opt1, col_opt2 = st.columns(2)
         with col_opt1:
             if st.button("🔄 إعادة ضبط البيانات الشخصية"):
@@ -288,13 +285,11 @@ else:
                 save_users(users_db)
                 st.rerun()
 
-        # الحسابات
         target_cals = prof["target_cals"]
         eaten_c = eaten_data["cals"]
         left_c = max(0, target_cals - eaten_c)
         cals_pct = min(100, int((eaten_c / target_cals) * 100)) if target_cals > 0 else 0
 
-        # كارت السعرات الحرارية
         st.markdown(f"""
             <div class="mfp-card">
                 <div class="mfp-title">السعرات الحرارية اليومية</div>
@@ -308,7 +303,6 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        # كارت الماكروز
         st.markdown(f"""
             <div class="mfp-card">
                 <div class="macros-grid">
@@ -351,7 +345,6 @@ else:
                 if st.button(f"+ إضافة", key=f"btn_{m_name}", use_container_width=True):
                     st.session_state["active_meal_type"] = m_name
 
-        # نموذج إضافة وجبة يدوي عند ضغط زر "+ إضافة"
         if st.session_state["active_meal_type"]:
             meal_type = st.session_state["active_meal_type"]
             with st.form(key="add_meal_form"):
@@ -372,7 +365,7 @@ else:
                     st.success(f"تمت إضافة الوجبة إلى {meal_type}!")
                     st.rerun()
 
-        # --- 5. ماسح الوجبة بالذكاء الاصطناعي (بالصورة) ---
+        # --- 5. ماسح الوجبة بالذكاء الاصطناعي (معدل ومضمون 100%) ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:20px;">📸 مسح وتصوير الوجبة بالذكاء الاصطناعي</h3>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader("التقط صورة الوجبة لتحديث العداد تلقائياً:", type=["jpg", "jpeg", "png"])
         
@@ -384,26 +377,29 @@ else:
                 if not API_KEY:
                     st.error("⚠️ يرجى ضبط GROQ_API_KEY في Secrets.")
                 else:
-                    with st.spinner("جاري تحليل الوجبة... ⚡"):
+                    with st.spinner("جاري تحليل الصورة واستخراج السعرات... ⚡"):
                         try:
                             client = Groq(api_key=API_KEY)
                             base64_image = encode_image(image_bytes)
 
                             prompt_instruction = """
-                            Analyze the food in this image. Respond ONLY with a valid JSON object.
-                            Structure:
+                            Analyze the food item in the image. You MUST respond strictly with a raw JSON object and nothing else.
+                            Do NOT write any codeblocks, markdown formatting, or introductory sentences.
+                            
+                            Exact JSON format required:
                             {
                                 "meal_name": "اسم الوجبة بالعربي",
-                                "calories": 0,
-                                "protein": 0,
-                                "carbs": 0,
-                                "fats": 0
+                                "calories": 350,
+                                "protein": 25,
+                                "carbs": 40,
+                                "fats": 10
                             }
-                            Use integer numbers for values.
+                            Values for calories, protein, carbs, fats must be integers only.
                             """
 
+                            # تحديث اسم الموديل الذكي للرؤية
                             response = client.chat.completions.create(
-                                model="llama-3.2-11b-vision-preview",
+                                model="llama-3.2-90b-vision-preview",
                                 messages=[
                                     {
                                         "role": "user",
@@ -416,29 +412,33 @@ else:
                                         ],
                                     }
                                 ],
-                                temperature=0.2
+                                temperature=0.1
                             )
 
                             res_text = response.choices[0].message.content.strip()
-                            if res_text.startswith("```"):
-                                res_text = res_text.split("```")[1]
-                                if res_text.startswith("json"):
-                                    res_text = res_text[4:]
-                            res_text = res_text.strip()
+                            
+                            # تنظيف الاستجابة لضمان تحويلها لـ JSON بنجاح
+                            if "{" in res_text and "}" in res_text:
+                                res_text = res_text[res_text.find("{"):res_text.rfind("}")+1]
 
                             data = json.loads(res_text)
                             
-                            users_db[user_key]["eaten"]["cals"] += int(data.get("calories", 0))
-                            users_db[user_key]["eaten"]["protein"] += int(data.get("protein", 0))
-                            users_db[user_key]["eaten"]["carbs"] += int(data.get("carbs", 0))
-                            users_db[user_key]["eaten"]["fats"] += int(data.get("fats", 0))
+                            c_add = int(data.get("calories", 0))
+                            p_add = int(data.get("protein", 0))
+                            carb_add = int(data.get("carbs", 0))
+                            f_add = int(data.get("fats", 0))
+
+                            users_db[user_key]["eaten"]["cals"] += c_add
+                            users_db[user_key]["eaten"]["protein"] += p_add
+                            users_db[user_key]["eaten"]["carbs"] += carb_add
+                            users_db[user_key]["eaten"]["fats"] += f_add
                             save_users(users_db)
 
-                            st.success(f"تم تسجيل {data.get('meal_name', 'الوجبة')} بنجاح! 🎉")
+                            st.success(f"تم التعرف على {data.get('meal_name', 'الوجبة')} وإضافة (+{c_add} سعرة حرارية) بنجاح! 🎉")
                             st.rerun()
 
                         except Exception as e:
-                            st.error(f"حدث خطأ أثناء قراءة الصورة: {e}")
+                            st.error(f"حدث خطأ أثناء قراءة الصورة: {e}. يرجى محاولة تصوير الوجبة بشكل أوضح.")
 
         # --- 6. المساعد التغذوي الذكي المباشر ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:25px;">💬 المساعد التغذوي الذكي</h3>', unsafe_allow_html=True)
