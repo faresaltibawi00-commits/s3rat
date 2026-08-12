@@ -365,7 +365,7 @@ else:
                     st.success(f"تمت إضافة الوجبة إلى {meal_type}!")
                     st.rerun()
 
-        # --- 5. ماسح الوجبة بالذكاء الاصطناعي (معدل ومضمون 100%) ---
+        # --- 5. ماسح الوجبة بالذكاء الاصطناعي (الموديل المعتمد الجديد) ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:20px;">📸 مسح وتصوير الوجبة بالذكاء الاصطناعي</h3>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader("التقط صورة الوجبة لتحديث العداد تلقائياً:", type=["jpg", "jpeg", "png"])
         
@@ -397,9 +397,9 @@ else:
                             Values for calories, protein, carbs, fats must be integers only.
                             """
 
-                            # تحديث اسم الموديل الذكي للرؤية
+                            # الموديل النشط والمعتمد حالياً للرؤية من Groq
                             response = client.chat.completions.create(
-                                model="llama-3.2-90b-vision-preview",
+                                model="llama-3.2-11b-vision-instruct",
                                 messages=[
                                     {
                                         "role": "user",
