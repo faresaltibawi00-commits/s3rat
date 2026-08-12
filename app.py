@@ -17,7 +17,7 @@ API_KEY = None
 if "GROQ_API_KEY" in st.secrets:
     API_KEY = str(st.secrets["GROQ_API_KEY"]).strip()
 
-# 3. حفظ واسترجاع الحسابات في ملف لتجنب ضياعها (Fix Login Bug)
+# 3. إدارة قاعدة البيانات المحلية
 DB_FILE = "users_db.json"
 
 def load_users():
@@ -26,8 +26,8 @@ def load_users():
             with open(DB_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         except:
-            return {"user": {"pass": "1234", "profile": None}}
-    return {"user": {"pass": "1234", "profile": None}}
+            return {}
+    return {}
 
 def save_users(users_data):
     with open(DB_FILE, "w", encoding="utf-8") as f:
@@ -40,18 +40,10 @@ if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "current_user" not in st.session_state:
     st.session_state["current_user"] = None
+if "active_meal_type" not in st.session_state:
+    st.session_state["active_meal_type"] = None
 
-# قيم المأكولات اليومية
-if "eaten_cals" not in st.session_state:
-    st.session_state["eaten_cals"] = 0
-if "eaten_protein" not in st.session_state:
-    st.session_state["eaten_protein"] = 0
-if "eaten_carbs" not in st.session_state:
-    st.session_state["eaten_carbs"] = 0
-if "eaten_fats" not in st.session_state:
-    st.session_state["eaten_fats"] = 0
-
-# 5. التنسيق والتصميم (MyFitnessPal Dark Mode Style)
+# 5. التنسيق والتصميم (MyFitnessPal Style)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap');
@@ -175,7 +167,11 @@ if not st.session_state["logged_in"]:
                 elif new_pass != confirm_pass:
                     st.error("كلمتا المرور غير متطابقتين!")
                 else:
-                    users_db[new_user] = {"pass": new_pass, "profile": None}
+                    users_db[new_user] = {
+                        "pass": new_pass,
+                        "profile": None,
+                        "eaten": {"cals": 0, "protein": 0, "carbs": 0, "fats": 0}
+                    }
                     save_users(users_db)
                     st.session_state["logged_in"] = True
                     st.session_state["current_user"] = new_user
@@ -184,9 +180,14 @@ if not st.session_state["logged_in"]:
 
 else:
     user_key = st.session_state["current_user"]
-    user_profile = users_db[user_key].get("profile")
+    user_data = users_db.get(user_key, {})
+    user_profile = user_data.get("profile")
 
-    # --- 2. شاشة إدخال الجسم والهدف (تظهر فوراً عند أول دخول إذا لم تكن مدخلة) ---
+    # تهيئة بيانات الأكل المحفوظة
+    if "eaten" not in user_data:
+        user_data["eaten"] = {"cals": 0, "protein": 0, "carbs": 0, "fats": 0}
+
+    # --- 2. شاشة إدخال الجسم والهدف ---
     if not user_profile:
         st.markdown('<h2 style="text-align:center; color:#38ef7d;">📝 البيانات الشخصية والهدف</h2>', unsafe_allow_html=True)
         st.write("أهلاً بك! يرجى إدخال بياناتك بدقة لتحديد الاحتياج اليومي المناسب لك:")
@@ -211,7 +212,6 @@ else:
             ])
 
         if st.button("حفظ البيانات والدخول للبرنامج 🚀", use_container_width=True):
-            # معادلة ميفلين-سانت جوؤر المعتمدة عالمياً للحساب الدقيق
             if gender == "ذكر":
                 bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5
             else:
@@ -232,7 +232,6 @@ else:
             else:
                 target_cals = tdee
 
-            # توزيع منطقي وواقعي للماكروز (بروتين 2g لكل كجم، دهون 0.9g لكل كجم، والباقي كارب)
             target_p = weight * 2.0
             target_f = weight * 0.9
             rem_cals_for_carbs = target_cals - ((target_p * 4) + (target_f * 9))
@@ -249,9 +248,10 @@ else:
             save_users(users_db)
             st.rerun()
 
-    # --- 3. الواجهة الرئيسية للبرنامج (بعد حفظ البيانات) ---
+    # --- 3. الواجهة الرئيسية للبرنامج ---
     else:
         prof = user_profile
+        eaten_data = user_data["eaten"]
         
         c_head1, c_head2 = st.columns([4, 1])
         with c_head1:
@@ -275,16 +275,22 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        # زر تعديل البيانات الشخصية
-        with st.expander("⚙️ تعديل بيانات الوزن والطول والهدف", expanded=False):
-            if st.button("إعادة ضبط البيانات الشخصية 🔄"):
+        # زر تعديل البيانات وتصفير اليوم
+        col_opt1, col_opt2 = st.columns(2)
+        with col_opt1:
+            if st.button("🔄 إعادة ضبط البيانات الشخصية"):
                 users_db[user_key]["profile"] = None
+                save_users(users_db)
+                st.rerun()
+        with col_opt2:
+            if st.button("🗑️ تصفير سعرات اليوم"):
+                users_db[user_key]["eaten"] = {"cals": 0, "protein": 0, "carbs": 0, "fats": 0}
                 save_users(users_db)
                 st.rerun()
 
         # الحسابات
         target_cals = prof["target_cals"]
-        eaten_c = st.session_state["eaten_cals"]
+        eaten_c = eaten_data["cals"]
         left_c = max(0, target_cals - eaten_c)
         cals_pct = min(100, int((eaten_c / target_cals) * 100)) if target_cals > 0 else 0
 
@@ -308,27 +314,28 @@ else:
                 <div class="macros-grid">
                     <div>
                         <div class="macro-item-title">الكربوهيدرات</div>
-                        <div class="macro-item-val">{st.session_state["eaten_carbs"]}g</div>
+                        <div class="macro-item-val">{eaten_data["carbs"]}g</div>
                         <div class="macro-item-sub">من {prof["target_c"]}g</div>
                     </div>
                     <div>
                         <div class="macro-item-title">الدهون</div>
-                        <div class="macro-item-val">{st.session_state["eaten_fats"]}g</div>
+                        <div class="macro-item-val">{eaten_data["fats"]}g</div>
                         <div class="macro-item-sub">من {prof["target_f"]}g</div>
                     </div>
                     <div>
                         <div class="macro-item-title">البروتين</div>
-                        <div class="macro-item-val">{st.session_state["eaten_protein"]}g</div>
+                        <div class="macro-item-val">{eaten_data["protein"]}g</div>
                         <div class="macro-item-sub">من {prof["target_p"]}g</div>
                     </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-        # قائمة الوجبات
+        # --- 4. قائمة الوجبات والإضافة اليدوية ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:15px;">الوجبات (Meals)</h3>', unsafe_allow_html=True)
 
-        for m_icon, m_name in [("☕", "وجبة الإفطار"), ("🍔", "وجبة الغداء"), ("🥗", "وجبة العشاء")]:
+        meals_list = [("☕", "وجبة الإفطار"), ("🍔", "وجبة الغداء"), ("🥗", "وجبة العشاء")]
+        for m_icon, m_name in meals_list:
             col_m1, col_m2 = st.columns([4, 1])
             with col_m1:
                 st.markdown(f"""
@@ -341,17 +348,39 @@ else:
                 """, unsafe_allow_html=True)
             with col_m2:
                 st.write(" ")
-                st.button("+ إضافة", key=f"btn_{m_name}", use_container_width=True)
+                if st.button(f"+ إضافة", key=f"btn_{m_name}", use_container_width=True):
+                    st.session_state["active_meal_type"] = m_name
 
-        # ماسح الصورة
-        st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:20px;">📸 مسح وتصوير الوجبة</h3>', unsafe_allow_html=True)
+        # نموذج إضافة وجبة يدوي عند ضغط زر "+ إضافة"
+        if st.session_state["active_meal_type"]:
+            meal_type = st.session_state["active_meal_type"]
+            with st.form(key="add_meal_form"):
+                st.markdown(f'<h4 style="color:#38ef7d;">إضافة عنصر إلى: {meal_type}</h4>', unsafe_allow_html=True)
+                m_cals = st.number_input("السعرات الحرارية (kcal):", min_value=0, value=250)
+                m_prot = st.number_input("البروتين (جرام):", min_value=0, value=20)
+                m_carb = st.number_input("الكربوهيدرات (جرام):", min_value=0, value=30)
+                m_fats = st.number_input("الدهون (جرام):", min_value=0, value=5)
+                
+                btn_submit = st.form_submit_button("إضافة الوجبة للعدادات 🎯")
+                if btn_submit:
+                    users_db[user_key]["eaten"]["cals"] += m_cals
+                    users_db[user_key]["eaten"]["protein"] += m_prot
+                    users_db[user_key]["eaten"]["carbs"] += m_carb
+                    users_db[user_key]["eaten"]["fats"] += m_fats
+                    save_users(users_db)
+                    st.session_state["active_meal_type"] = None
+                    st.success(f"تمت إضافة الوجبة إلى {meal_type}!")
+                    st.rerun()
+
+        # --- 5. ماسح الوجبة بالذكاء الاصطناعي (بالصورة) ---
+        st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:20px;">📸 مسح وتصوير الوجبة بالذكاء الاصطناعي</h3>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader("التقط صورة الوجبة لتحديث العداد تلقائياً:", type=["jpg", "jpeg", "png"])
         
         if uploaded_file is not None:
             image_bytes = uploaded_file.read()
             st.image(image_bytes, caption="الوجبة المرفوعة", use_container_width=True)
             
-            if st.button("⚡ تحليل وتسجيل الوجبة", use_container_width=True):
+            if st.button("⚡ تحليل وتسجيل الوجبة بالصورة", use_container_width=True):
                 if not API_KEY:
                     st.error("⚠️ يرجى ضبط GROQ_API_KEY في Secrets.")
                 else:
@@ -399,13 +428,36 @@ else:
 
                             data = json.loads(res_text)
                             
-                            st.session_state["eaten_cals"] += int(data.get("calories", 0))
-                            st.session_state["eaten_protein"] += int(data.get("protein", 0))
-                            st.session_state["eaten_carbs"] += int(data.get("carbs", 0))
-                            st.session_state["eaten_fats"] += int(data.get("fats", 0))
+                            users_db[user_key]["eaten"]["cals"] += int(data.get("calories", 0))
+                            users_db[user_key]["eaten"]["protein"] += int(data.get("protein", 0))
+                            users_db[user_key]["eaten"]["carbs"] += int(data.get("carbs", 0))
+                            users_db[user_key]["eaten"]["fats"] += int(data.get("fats", 0))
+                            save_users(users_db)
 
                             st.success(f"تم تسجيل {data.get('meal_name', 'الوجبة')} بنجاح! 🎉")
                             st.rerun()
 
                         except Exception as e:
-                            st.error(f"حدث خطأ أثناء القراءة: {e}")
+                            st.error(f"حدث خطأ أثناء قراءة الصورة: {e}")
+
+        # --- 6. المساعد التغذوي الذكي المباشر ---
+        st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:25px;">💬 المساعد التغذوي الذكي</h3>', unsafe_allow_html=True)
+        with st.expander("اسأل أخصائي التغذية الذكي عن أي استفسار", expanded=True):
+            user_question = st.text_input("مثال: كم سعرة في بيضتين مسلوقتين؟ أو اقترح لي وجبة عشاء عالية بالبروتين:")
+            if st.button("إرسال السؤال 🤖") and user_question:
+                if not API_KEY:
+                    st.error("⚠️ يرجى التأكد من ضبط مفتاح GROQ_API_KEY.")
+                else:
+                    with st.spinner("جاري التفكير والتأكد من المعلومة... ⚡"):
+                        try:
+                            client = Groq(api_key=API_KEY)
+                            chat_completion = client.chat.completions.create(
+                                messages=[
+                                    {"role": "system", "content": "أنت أخصائي تغذية وخبير دايت محترف ومبتكر. أجب باللغة العربية بدقة عالية وبأسلوب مشجع ومختصر."},
+                                    {"role": "user", "content": user_question}
+                                ],
+                                model="llama-3.3-70b-versatile",
+                            )
+                            st.info(chat_completion.choices[0].message.content)
+                        except Exception as e:
+                            st.error(f"حدث خطأ: {e}")
