@@ -1,6 +1,8 @@
 import streamlit as st
-from google import genai
+import requests
+import base64
 from PIL import Image
+import io
 
 # 1. إعدادات الصفحة
 st.set_page_config(
@@ -10,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. جلب المفتاح تلقائياً من إعدادات Streamlit السريّة (Secrets)
+# 2. جلب المفتاح تلقائياً من Secrets
 API_KEY = None
 if "GEMINI_API_KEY" in st.secrets:
     API_KEY = str(st.secrets["GEMINI_API_KEY"]).strip()
@@ -22,7 +24,7 @@ if "logged_in" not in st.session_state:
 if "users_db" not in st.session_state:
     st.session_state["users_db"] = {"user": "1234"}
 
-# 4. التنسيق وإخفاء القائمة الجانبية
+# 4. التنسيق
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -78,7 +80,48 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- شاشة التسجيل / الدخول ---
+# دالة التعامل مع الـ API (تدعم المفاتيح القديمة والجديدة AQ)
+def query_gemini(prompt, image=None):
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    
+    headers = {"Content-Type": "application/json"}
+    
+    # التعامل مع نوع المفتاح
+    if API_KEY.startswith("AQ"):
+        headers["Authorization"] = f"Bearer {API_KEY}"
+        request_url = url
+    else:
+        request_url = f"{url}?key={API_KEY}"
+
+    contents_parts = []
+    
+    if image is not None:
+        buffered = io.BytesIO()
+        image.save(buffered, format="JPEG")
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        contents_parts.append({
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": img_str
+            }
+        })
+        
+    contents_parts.append({"text": prompt})
+    
+    payload = {
+        "contents": [{
+            "parts": contents_parts
+        }]
+    }
+
+    res = requests.post(request_url, json=payload, headers=headers)
+    if res.status_code == 200:
+        data = res.json()
+        return data['candidates'][0]['content']['parts'][0]['text']
+    else:
+        raise Exception(f"خطأ ({res.status_code}): {res.text}")
+
+# --- شاشة الدخول والتسجيل ---
 if not st.session_state["logged_in"]:
     st.markdown("""
         <div class="hero-banner">
@@ -196,14 +239,10 @@ else:
             else:
                 with st.spinner("جاري تحليل الوجبة... ⏳"):
                     try:
-                        client = genai.Client(api_key=API_KEY)
                         prompt = "أنت أخصائي تغذية خبير ومحترف. قم بتحليل الوجبة في الصورة بدقة باللغة العربية واذكر السعرات والماكروز والتفاصيل."
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=[prompt, image]
-                        )
+                        ans = query_gemini(prompt, image)
                         st.success("تم التحليل بنجاح! 🎉")
-                        st.markdown(response.text)
+                        st.markdown(ans)
                     except Exception as e:
                         st.error(f"حدث خطأ أثناء التحليل: {e}")
 
@@ -218,12 +257,8 @@ else:
         else:
             with st.spinner("جاري الإجابة..."):
                 try:
-                    client = genai.Client(api_key=API_KEY)
                     chat_prompt = f"أجب كأخصائي تغذية بأسلوب مشجع ومختصر باللغة العربية على السؤال التالي: {user_question}"
-                    chat_response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=chat_prompt
-                    )
-                    st.info(chat_response.text)
+                    ans = query_gemini(chat_prompt)
+                    st.info(ans)
                 except Exception as e:
                     st.error(f"حدث خطأ: {e}")
