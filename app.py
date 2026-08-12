@@ -4,7 +4,7 @@ from PIL import Image
 
 # 1. إعدادات الصفحة
 st.set_page_config(
-    page_title="fares s3rat",
+    page_title="faress3rat",
     page_icon="🥗",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -21,10 +21,9 @@ if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
 if "users_db" not in st.session_state:
-    # حساب افتراضي للتجربة
     st.session_state["users_db"] = {"user": "1234"}
 
-# 4. تحسين المظهر والتنسيق (CSS)
+# 4. تحسين المظهر وإخفاء القائمة الجانبية تماماً
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -33,6 +32,14 @@ st.markdown("""
         font-family: 'Tajawal', sans-serif !important;
         direction: rtl;
         text-align: right;
+    }
+
+    /* إخفاء القائمة الجانبية وزر الفتح نهائياً */
+    [data-testid="stSidebar"] {
+        display: none !important;
+    }
+    [data-testid="collapsedControl"] {
+        display: none !important;
     }
     
     /* الشريط المخصص لشاشة الدخول */
@@ -98,10 +105,9 @@ st.markdown("""
 
 # --- شاشة التسجيل / الدخول (قبل الدخول) ---
 if not st.session_state["logged_in"]:
-    # الشريط الوردي/الخاطف للانتباه بكتابة "خيارك الأنسب"
     st.markdown("""
         <div class="hero-banner">
-            <h1>🥗 fares s3rat</h1>
+            <h1>🥗 faress3rat</h1>
             <div class="sub-title">✨ خيارك الأنسب ✨</div>
         </div>
     """, unsafe_allow_html=True)
@@ -139,27 +145,26 @@ if not st.session_state["logged_in"]:
                 elif new_pass != confirm_pass:
                     st.error("كلمتا المرور غير متطابقتين!")
                 else:
-                    # حفظ الحساب وتوقيع الدخول فوراً
                     st.session_state["users_db"][new_user] = new_pass
                     st.session_state["logged_in"] = True
                     st.success("تم إنشاء الحساب بنجاح!")
                     st.rerun()
 
 else:
-    # --- التطبيق الرئيسي (بعد الدخول - يختفي الشريط الترحيبي تلقائياً) ---
-    st.markdown("""
-        <div class="main-header">
-            <h1>🥗 fares s3rat</h1>
-            <p>حاسبة السعرات الحرارية وتحليل الوجبات بالذكاء الاصطناعي</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # القائمة الجانبية
-    with st.sidebar:
-        st.header("⚙️ الإعدادات")
+    # --- التطبيق الرئيسي ---
+    # إضافة زر خروج في أعلى الصفحة بدلاً من القائمة الجانبية
+    col_h1, col_h2 = st.columns([5, 1])
+    with col_h2:
         if st.button("تسجيل الخروج 🚪"):
             st.session_state["logged_in"] = False
             st.rerun()
+
+    st.markdown("""
+        <div class="main-header">
+            <h1>🥗 faress3rat</h1>
+            <p>حاسبة السعرات الحرارية وتحليل الوجبات بالذكاء الاصطناعي</p>
+        </div>
+    """, unsafe_allow_html=True)
 
     # 1. حساب الاحتياج اليومي
     st.subheader("📊 1. حساب الاحتياج اليومي (TDEE)")
