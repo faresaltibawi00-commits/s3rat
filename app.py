@@ -1,5 +1,5 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 from PIL import Image
 
 # 1. إعدادات الصفحة
@@ -10,11 +10,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. جلب المفتاح وإعداد موديل الذكاء الاصطناعي
+# 2. جلب المفتاح تلقائياً من إعدادات Streamlit السريّة (Secrets)
 API_KEY = None
 if "GEMINI_API_KEY" in st.secrets:
     API_KEY = str(st.secrets["GEMINI_API_KEY"]).strip()
-    genai.configure(api_key=API_KEY)
 
 # 3. إدارة جلسة المستخدم
 if "logged_in" not in st.session_state:
@@ -23,7 +22,7 @@ if "logged_in" not in st.session_state:
 if "users_db" not in st.session_state:
     st.session_state["users_db"] = {"user": "1234"}
 
-# 4. التنسيق والمظهر
+# 4. التنسيق وإخفاء القائمة الجانبية
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -79,7 +78,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- شاشة الدخول والتسجيل ---
+# --- شاشة التسجيل / الدخول ---
 if not st.session_state["logged_in"]:
     st.markdown("""
         <div class="hero-banner">
@@ -197,9 +196,12 @@ else:
             else:
                 with st.spinner("جاري تحليل الوجبة... ⏳"):
                     try:
-                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        client = genai.Client(api_key=API_KEY)
                         prompt = "أنت أخصائي تغذية خبير ومحترف. قم بتحليل الوجبة في الصورة بدقة باللغة العربية واذكر السعرات والماكروز والتفاصيل."
-                        response = model.generate_content([prompt, image])
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=[prompt, image]
+                        )
                         st.success("تم التحليل بنجاح! 🎉")
                         st.markdown(response.text)
                     except Exception as e:
@@ -216,9 +218,12 @@ else:
         else:
             with st.spinner("جاري الإجابة..."):
                 try:
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    client = genai.Client(api_key=API_KEY)
                     chat_prompt = f"أجب كأخصائي تغذية بأسلوب مشجع ومختصر باللغة العربية على السؤال التالي: {user_question}"
-                    chat_response = model.generate_content(chat_prompt)
+                    chat_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=chat_prompt
+                    )
                     st.info(chat_response.text)
                 except Exception as e:
                     st.error(f"حدث خطأ: {e}")
