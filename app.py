@@ -365,7 +365,7 @@ else:
                     st.success(f"تمت إضافة الوجبة إلى {meal_type}!")
                     st.rerun()
 
-        # --- 5. ماسح الوجبة بالذكاء الاصطناعي مع تحسين رسالة الخطأ ---
+        # --- 5. ماسح الوجبة بالذكاء الاصطناعي ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:20px;">📸 مسح وتصوير الوجبة بالذكاء الاصطناعي</h3>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader("التقط صورة الوجبة لتحديث العداد تلقائياً:", type=["jpg", "jpeg", "png"])
         
@@ -384,9 +384,8 @@ else:
 
                             prompt_instruction = """
                             Analyze the food item in the image. You MUST respond strictly with a raw JSON object and nothing else.
-                            Do NOT write any codeblocks, markdown formatting, or introductory sentences.
                             
-                            Exact JSON format required:
+                            Format:
                             {
                                 "meal_name": "اسم الوجبة بالعربي",
                                 "calories": 350,
@@ -394,12 +393,11 @@ else:
                                 "carbs": 40,
                                 "fats": 10
                             }
-                            Values for calories, protein, carbs, fats must be integers only.
                             """
 
-                            # تجربة استدعاء الموديل
+                            # الموديل المعتمد حالياً للصور في Groq
                             response = client.chat.completions.create(
-                                model="llama-3.2-11b-vision-preview",
+                                model="qwen/qwen3.6-27b",
                                 messages=[
                                     {
                                         "role": "user",
@@ -437,10 +435,9 @@ else:
                             st.rerun()
 
                         except Exception:
-                            # الاستبدال المباشر لرسالة الخطأ الطويلة
                             st.error("يرجى التصوير بشكل واضح")
 
-        # --- 6. المساعد التغذوي الذكي المباشر ---
+        # --- 6. المساعد التغذوي الذكي ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:25px;">💬 المساعد التغذوي الذكي</h3>', unsafe_allow_html=True)
         with st.expander("اسأل أخصائي التغذية الذكي عن أي استفسار", expanded=True):
             user_question = st.text_input("مثال: كم سعرة في بيضتين مسلوقتين؟ أو اقترح لي وجبة عشاء عالية بالبروتين:")
