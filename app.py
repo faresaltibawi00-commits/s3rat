@@ -3,6 +3,8 @@ from groq import Groq
 import base64
 import json
 import os
+from PIL import Image
+import io
 
 # 1. إعدادات الصفحة
 st.set_page_config(
@@ -44,6 +46,16 @@ if "active_meal_type" not in st.session_state:
     st.session_state["active_meal_type"] = None
 if "scanned_meal_result" not in st.session_state:
     st.session_state["scanned_meal_result"] = None
+
+# دالة ضغط الصور لتسريع الاستجابة ومنع تعليق التطبيق
+def process_and_encode_image(image_bytes, max_size=(800, 800), quality=75):
+    img = Image.open(io.BytesIO(image_bytes))
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    img.thumbnail(max_size)
+    buffered = io.BytesIO()
+    img.save(buffered, format="JPEG", quality=quality)
+    return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 # 5. التنسيق والتصميم (MyFitnessPal Style)
 st.markdown("""
@@ -135,9 +147,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def encode_image(image_bytes):
-    return base64.b64encode(image_bytes).decode('utf-8')
-
 # --- 1. شاشة تسجيل الدخول وإنشاء الحساب ---
 if not st.session_state["logged_in"]:
     st.markdown('<h1 style="text-align:center; color:#38ef7d; margin-top:30px; font-weight:900;">🥗 faress3rat</h1>', unsafe_allow_html=True)
@@ -188,7 +197,7 @@ else:
     if "eaten" not in user_data:
         user_data["eaten"] = {"cals": 0, "protein": 0, "carbs": 0, "fats": 0}
 
-    # --- 2. شاشة إدخال الجسم والهدف ---
+    # --- 2. شاشة إدخال البيانات والهدف ---
     if not user_profile:
         st.markdown('<h2 style="text-align:center; color:#38ef7d;">📝 البيانات الشخصية والهدف</h2>', unsafe_allow_html=True)
         st.write("أهلاً بك! يرجى إدخال بياناتك بدقة لتحديد الاحتياج اليومي المناسب لك:")
@@ -369,7 +378,7 @@ else:
                     st.success(f"تمت إضافة الوجبة إلى {meal_type}!")
                     st.rerun()
 
-        # --- 5. ماسح الوجبة بالذكاء الاصطناعي مع إمكانية التعديل قبل الإضافة ---
+        # --- 5. ماسح الوجبة بالذكاء الاصطناعي السريع والمحسن ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:20px;">📸 مسح وتصوير الوجبة بالذكاء الاصطناعي</h3>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader("التقط صورة الوجبة لاستخراج السعرات ثم معاينتها وتعديلها:", type=["jpg", "jpeg", "png"])
         
@@ -381,21 +390,23 @@ else:
                 if not API_KEY:
                     st.error("⚠️ يرجى ضبط GROQ_API_KEY في Secrets.")
                 else:
-                    with st.spinner("جاري تقدير مكونات الوجبة والسعرات... ⚡"):
+                    with st.spinner("جاري تحليل الصورة بسرعة... ⚡"):
                         try:
                             client = Groq(api_key=API_KEY)
-                            base64_image = encode_image(image_bytes)
+                            
+                            # ضغط الصورة تلقائياً لتسريع استجابة السيرفر
+                            base64_image = process_and_encode_image(image_bytes)
 
                             prompt_instruction = """
-                            Analyze the food item in the image and estimate its nutritional values accurately based on standard single-serving portion sizes.
-                            You MUST respond strictly with a raw JSON object and nothing else.
+                            Analyze the food or drink item in the image and estimate its nutritional values.
+                            You MUST respond strictly with a JSON object.
                             Format:
                             {
                                 "meal_name": "اسم الوجبة بالعربي",
-                                "calories": 350,
-                                "protein": 25,
-                                "carbs": 40,
-                                "fats": 10
+                                "calories": 250,
+                                "protein": 15,
+                                "carbs": 30,
+                                "fats": 8
                             }
                             """
 
@@ -413,14 +424,11 @@ else:
                                         ],
                                     }
                                 ],
-                                temperature=0.2
+                                response_format={"type": "json_object"},
+                                temperature=0.1
                             )
 
                             res_text = response.choices[0].message.content.strip()
-                            
-                            if "{" in res_text and "}" in res_text:
-                                res_text = res_text[res_text.find("{"):res_text.rfind("}")+1]
-
                             data = json.loads(res_text)
                             
                             st.session_state["scanned_meal_result"] = {
@@ -435,7 +443,7 @@ else:
                             st.session_state["scanned_meal_result"] = None
                             st.error("يرجى التصوير بشكل واضح")
 
-        # --- كرت المعاينة والتعديل قبل الإضافة الفعليه ---
+        # --- كرت المعاينة والتعديل قبل الإضافة ---
         if st.session_state["scanned_meal_result"]:
             res = st.session_state["scanned_meal_result"]
             st.markdown("---")
