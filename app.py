@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. جلب مفتاح Groq
+# 2. جلب المفتاح
 API_KEY = None
 if "GROQ_API_KEY" in st.secrets:
     API_KEY = str(st.secrets["GROQ_API_KEY"]).strip()
@@ -24,7 +24,7 @@ if "logged_in" not in st.session_state:
 if "users_db" not in st.session_state:
     st.session_state["users_db"] = {"user": "1234"}
 
-# قيم عداد الوجبة المحللة
+# العدادات الفورية
 if "total_cals" not in st.session_state:
     st.session_state["total_cals"] = 0
 if "total_protein" not in st.session_state:
@@ -34,9 +34,9 @@ if "total_carbs" not in st.session_state:
 if "total_fats" not in st.session_state:
     st.session_state["total_fats"] = 0
 if "meal_name" not in st.session_state:
-    st.session_state["meal_name"] = "لم يتم تحليل وجبة بعد"
+    st.session_state["meal_name"] = "لم يتم تحديد وجبة بعد"
 
-# 4. التنسيق والتصميم الفخم
+# 4. تصميم فاخر وعصري (Modern Dark Glassmorphism)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
@@ -49,73 +49,65 @@ st.markdown("""
 
     [data-testid="stSidebar"] { display: none !important; }
     [data-testid="collapsedControl"] { display: none !important; }
-    
-    .hero-banner {
-        background: linear-gradient(135deg, #0d3b66 0%, #00b4d8 100%);
-        padding: 40px 20px;
+
+    /* الهيدر والعنوان الرئيسي */
+    .brand-header {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        padding: 30px;
         border-radius: 20px;
         color: white;
         text-align: center;
         margin-bottom: 25px;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        box-shadow: 0 10px 25px rgba(17, 153, 142, 0.25);
     }
-    .hero-banner h1 {
-        color: #ffffff !important;
+    .brand-header h1 {
         font-size: 42px;
         font-weight: 900;
         margin: 0;
         letter-spacing: 1px;
+        color: #ffffff !important;
     }
-    .hero-banner .sub-title {
-        font-size: 18px;
-        font-weight: 700;
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(5px);
-        display: inline-block;
-        padding: 6px 24px;
-        border-radius: 30px;
-        margin-top: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-    }
-    
-    .main-header {
-        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        padding: 25px;
-        border-radius: 18px;
-        color: white;
-        text-align: center;
-        margin-bottom: 25px;
-        box-shadow: 0 6px 15px rgba(0,0,0,0.1);
-    }
-    .main-header h1 {
-        color: white !important;
-        font-size: 34px;
-        font-weight: 900;
-        margin: 0;
-    }
-    
-    .metric-card {
-        background: #ffffff;
-        border-radius: 14px;
-        padding: 16px;
-        text-align: center;
-        border: 2px solid #11998e;
-        margin-bottom: 10px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    }
-    .metric-value { font-size: 26px; font-weight: 900; color: #11998e; }
-    .metric-label { font-size: 14px; color: #555; font-weight: 700; }
-    
-    .meal-title-card {
-        background-color: #e8f5e9;
-        border-radius: 12px;
-        padding: 12px;
-        text-align: center;
+    .brand-header p {
         font-size: 16px;
-        font-weight: bold;
-        color: #1b5e20;
+        margin-top: 8px;
+        opacity: 0.95;
+    }
+
+    /* كروت العدادات الفخمة */
+    .metric-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: 4px solid #38ef7d;
+        border-radius: 16px;
+        padding: 20px 10px;
+        text-align: center;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        backdrop-filter: blur(10px);
         margin-bottom: 15px;
-        border: 1px solid #c8e6c9;
+    }
+    .metric-value {
+        font-size: 30px;
+        font-weight: 900;
+        color: #38ef7d;
+    }
+    .metric-label {
+        font-size: 14px;
+        color: #a0aec0;
+        font-weight: 700;
+        margin-top: 4px;
+    }
+
+    /* عنوان الوجبة */
+    .meal-box {
+        background: rgba(56, 239, 125, 0.1);
+        border: 1px dashed #38ef7d;
+        border-radius: 14px;
+        padding: 14px;
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+        color: #38ef7d;
+        margin-bottom: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -123,12 +115,12 @@ st.markdown("""
 def encode_image(image_bytes):
     return base64.b64encode(image_bytes).decode('utf-8')
 
-# --- شاشة الدخول والتسجيل ---
+# --- تسجيل الدخول / إنشاء حساب ---
 if not st.session_state["logged_in"]:
     st.markdown("""
-        <div class="hero-banner">
+        <div class="brand-header">
             <h1>🥗 faress3rat</h1>
-            <div class="sub-title">✨ خيارك الأنسب ✨</div>
+            <p>منصتك الاحترافية لإدارة التغذية والحسابات الرياضية</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -152,8 +144,8 @@ if not st.session_state["logged_in"]:
         with tab_signup:
             st.write(" ")
             new_user = st.text_input("اختر اسم المستخدم:", key="signup_u")
-            new_pass = st.text_input("اختر كلمة المرور:", type="password", key="signup_cp")
-            confirm_pass = st.text_input("تأكيد كلمة المرور:", type="password", key="signup_cp2")
+            new_pass = st.text_input("اختر كلمة المرور:", type="password", key="signup_p")
+            confirm_pass = st.text_input("تأكيد كلمة المرور:", type="password", key="signup_cp")
             
             if st.button("إنشاء الحساب والدخول فوراً 🎯", use_container_width=True):
                 if not new_user or not new_pass:
@@ -176,14 +168,13 @@ else:
             st.session_state["logged_in"] = False
             st.rerun()
 
-    # العنوان الفخم النظيف
     st.markdown("""
-        <div class="main-header">
+        <div class="brand-header">
             <h1>🥗 faress3rat</h1>
         </div>
     """, unsafe_allow_html=True)
 
-    # 1. قسم حساب الاحتياج اليومي (BMR / TDEE)
+    # 1. قسم حساب الاحتياج اليومي
     st.subheader("📊 1. حساب الاحتياج اليومي (TDEE)")
     
     col_c1, col_c2 = st.columns(2)
@@ -226,10 +217,10 @@ else:
 
     st.markdown("---")
 
-    # 2. قسم تحليل الوجبة بالصورة والعداد التفاعلي
-    st.subheader("📸 2. تحليل الوجبة بالذكاء الاصطناعي")
+    # 2. قسم التحليل بالصور والعدادات
+    st.subheader("📸 2. تحليل الوجبة تلقائياً")
     
-    st.markdown(f'<div class="meal-title-card">🍽️ الوجبة المحللة: {st.session_state["meal_name"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="meal-box">🍽️ الوجبة الحالية: {st.session_state["meal_name"]}</div>', unsafe_allow_html=True)
     
     m1, m2, m3, m4 = st.columns(4)
     with m1:
@@ -241,17 +232,17 @@ else:
     with m4:
         st.markdown(f'<div class="metric-card"><div class="metric-value">{st.session_state["total_fats"]}g</div><div class="metric-label">دهون</div></div>', unsafe_allow_html=True)
 
-    uploaded_file = st.file_uploader("ارفع أو صور وجبتك هنا...", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("التقط أو ارفع صورة الوجبة:", type=["jpg", "jpeg", "png"])
     
     if uploaded_file is not None:
         image_bytes = uploaded_file.read()
-        st.image(image_bytes, caption="الوجبة الملتقطة", use_container_width=True)
+        st.image(image_bytes, caption="الصورة المرفوعة", use_container_width=True)
         
-        if st.button("✨ تحليل الوجبة وتحديث العداد تلقائياً"):
+        if st.button("⚡ تحليل الوجبة واستخراج القيم"):
             if not API_KEY:
-                st.error("⚠️ لم يتم ضبط GROQ_API_KEY في Streamlit Secrets.")
+                st.error("⚠️ يرجى التأكد من ضبط المفتاح في الإعدادات.")
             else:
-                with st.spinner("جاري تحليل الوجبة بالذكاء الاصطناعي... ⚡"):
+                with st.spinner("جاري قراءة تفاصيل الوجبة وحساب القيم... ⚡"):
                     try:
                         client = Groq(api_key=API_KEY)
                         base64_image = encode_image(image_bytes)
@@ -303,21 +294,21 @@ else:
                         st.session_state["total_carbs"] = int(data.get("carbs", 0))
                         st.session_state["total_fats"] = int(data.get("fats", 0))
 
-                        st.success("تم التحليل وتحديث العداد بنجاح! 🎉")
+                        st.success("تم تحديث العدادات بنجاح! 🎉")
                         st.rerun()
 
                     except Exception as e:
-                        st.error(f"حدث خطأ أثناء التحليل: {e}")
+                        st.error(f"حدث خطأ أثناء القراءة: {e}")
 
     st.markdown("---")
 
-    # 3. قسم المساعد التغذوي الذكي
-    st.subheader("💬 3. المساعد التغذوي الذكي")
-    user_question = st.text_input("اسأل أي سؤال تغذوي إضافي:")
+    # 3. قسم المساعد التغذوي
+    st.subheader("💬 3. المساعد التغذوي المباشر")
+    user_question = st.text_input("اطرح أي سؤال تغذوي:")
     
     if user_question:
         if not API_KEY:
-            st.error("⚠️ لم يتم ضبط GROQ_API_KEY في Streamlit Secrets.")
+            st.error("⚠️ يرجى التأكد من ضبط المفتاح في الإعدادات.")
         else:
             with st.spinner("جاري الإجابة... ⚡"):
                 try:
@@ -326,7 +317,7 @@ else:
                         messages=[
                             {
                                 "role": "system",
-                                "content": "أنت خبير تغذية محترف ومساعد ذكي. أجب باللغة العربية بدقة وبشكل مبهج ومختصر."
+                                "content": "أنت خبير تغذية ومساعد محترف. أجب باللغة العربية بدقة وبشكل مبهج ومختصر."
                             },
                             {
                                 "role": "user",
