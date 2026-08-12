@@ -1,5 +1,9 @@
 import streamlit as st
 from groq import Groq
+import base64
+import json
+import io
+from PIL import Image
 
 # 1. إعدادات الصفحة
 st.set_page_config(
@@ -9,19 +13,31 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. جلب مفتاح Groq من Secrets
+# 2. جلب مفتاح Groq
 API_KEY = None
 if "GROQ_API_KEY" in st.secrets:
     API_KEY = str(st.secrets["GROQ_API_KEY"]).strip()
 
-# 3. إدارة جلسة المستخدم
+# 3. إدارة جلسة المستخدم والبيانات المتغيرة
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
 if "users_db" not in st.session_state:
     st.session_state["users_db"] = {"user": "1234"}
 
-# 4. التصميم والتنسيق
+# العدادات التفاعلية للوجبة المحللة
+if "total_cals" not in st.session_state:
+    st.session_state["total_cals"] = 0
+if "total_protein" not in st.session_state:
+    st.session_state["total_protein"] = 0
+if "total_carbs" not in st.session_state:
+    st.session_state["total_carbs"] = 0
+if "total_fats" not in st.session_state:
+    st.session_state["total_fats"] = 0
+if "meal_name" not in st.session_state:
+    st.session_state["meal_name"] = "لم يتم تحليل وجبة بعد"
+
+# 4. التنسيق والتصميم
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -69,13 +85,27 @@ st.markdown("""
         border-radius: 12px;
         padding: 15px;
         text-align: center;
-        border: 1px solid #e9ecef;
+        border: 2px solid #38ef7d;
         margin-bottom: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
-    .metric-value { font-size: 22px; font-weight: bold; color: #11998e; }
-    .metric-label { font-size: 13px; color: #6c757d; }
+    .metric-value { font-size: 24px; font-weight: bold; color: #11998e; }
+    .metric-label { font-size: 14px; color: #6c757d; font-weight: bold; }
+    .meal-title-card {
+        background-color: #e8f5e9;
+        border-radius: 10px;
+        padding: 10px;
+        text-align: center;
+        font-weight: bold;
+        color: #2e7d32;
+        margin-bottom: 15px;
+    }
     </style>
 """, unsafe_allow_html=True)
+
+# دالة تحويل الصورة إلى Base64
+def encode_image(image_bytes):
+    return base64.b64encode(image_bytes).decode('utf-8')
 
 # --- شاشة تسجيل الدخول وإنشاء الحساب ---
 if not st.session_state["logged_in"]:
@@ -133,56 +163,103 @@ else:
     st.markdown("""
         <div class="main-header">
             <h1>🥗 faress3rat</h1>
-            <p>حاسبة السعرات الحرارية والمساعد التغذوي الذكي</p>
+            <p>عداد السعرات التلقائي بالذكاء الاصطناعي</p>
         </div>
     """, unsafe_allow_html=True)
 
-    # 1. قسم حساب السعرات الاحتياج اليومي
-    st.subheader("📊 1. حساب الاحتياج اليومي (TDEE)")
+    # 📌 العدادات العلويّة التي تُحَدّث تلقائياً عند تحليل الصورة
+    st.markdown(f'<div class="meal-title-card">🍽️ الوجبة المحللة: {st.session_state["meal_name"]}</div>', unsafe_allow_html=True)
     
-    col_c1, col_c2 = st.columns(2)
-    with col_c1:
-        gender = st.radio("الجنس:", ("ذكر", "أنثى"), horizontal=True)
-        age = st.number_input("العمر:", min_value=10, max_value=100, value=25)
-        weight = st.number_input("الوزن (كجم):", min_value=30.0, max_value=200.0, value=70.0)
-    with col_c2:
-        height = st.number_input("الطول (سم):", min_value=100.0, max_value=230.0, value=170.0)
-        activity_level = st.selectbox(
-            "مستوى النشاط:",
-            ["خامل (بدون تمارين)", "نشاط خفيف (1-3 أيام)", "نشاط متوسط (3-5 أيام)", "نشاط عالٍ (6-7 أيام)"]
-        )
-        goal = st.selectbox("الهدف:", ["المحافظة على الوزن ⚖️", "تنشيف / إنقاص الوزن 📉", "تضخيم / زيادة الوزن 📈"])
-
-    bmr = (10 * weight) + (6.25 * height) - (5 * age) + (5 if gender == "ذكر" else -161)
-    act_map = {"خامل (بدون تمارين)": 1.2, "نشاط خفيف (1-3 أيام)": 1.375, "نشاط متوسط (3-5 أيام)": 1.55, "نشاط عالٍ (6-7 أيام)": 1.725}
-    tdee = bmr * act_map[activity_level]
-
-    if "تنشيف" in goal:
-        target_calories = tdee - 500
-    elif "تضخيم" in goal:
-        target_calories = tdee + 400
-    else:
-        target_calories = tdee
-
-    protein_g = (target_calories * 0.30) / 4
-    carbs_g = (target_calories * 0.40) / 4
-    fats_g = (target_calories * 0.30) / 9
-
     m1, m2, m3, m4 = st.columns(4)
     with m1:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{int(target_calories)}</div><div class="metric-label">سعرة حرارية</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{st.session_state["total_cals"]}</div><div class="metric-label">سعرة حرارية</div></div>', unsafe_allow_html=True)
     with m2:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{int(protein_g)}g</div><div class="metric-label">بروتين</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{st.session_state["total_protein"]}g</div><div class="metric-label">بروتين</div></div>', unsafe_allow_html=True)
     with m3:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{int(carbs_g)}g</div><div class="metric-label">كربوهيدرات</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{st.session_state["total_carbs"]}g</div><div class="metric-label">كربوهيدرات</div></div>', unsafe_allow_html=True)
     with m4:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{int(fats_g)}g</div><div class="metric-label">دهون</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{st.session_state["total_fats"]}g</div><div class="metric-label">دهون</div></div>', unsafe_allow_html=True)
 
     st.markdown("---")
 
-    # 2. قسم المساعد التغذوي الذكي
+    # 2. قسم التصوير / رفع الصورة وتحليلها آلياً
+    st.subheader("📸 1. صور وجبتك لتحليلها فورياً")
+
+    uploaded_file = st.file_uploader("ارفع أو صور وجبتك هنا...", type=["jpg", "jpeg", "png"])
+    
+    if uploaded_file is not None:
+        image_bytes = uploaded_file.read()
+        st.image(image_bytes, caption="الوجبة الملتقطة", use_container_width=True)
+        
+        if st.button("✨ تحليل الوجبة وتحديث العداد تلقائياً"):
+            if not API_KEY:
+                st.error("⚠️ لم يتم ضبط GROQ_API_KEY في Streamlit Secrets.")
+            else:
+                with st.spinner("جاري تحليل الوجبة بالذكاء الاصطناعي وتحديث العداد فوق... ⚡"):
+                    try:
+                        client = Groq(api_key=API_KEY)
+                        base64_image = encode_image(image_bytes)
+
+                        prompt_instruction = """
+                        Analyze the food in this image. Respond ONLY with a valid JSON object. Do not include markdown code block formatting like ```json.
+                        The JSON must strictly follow this structure:
+                        {
+                            "meal_name": "اسم الوجبة بالعربي",
+                            "calories": 0,
+                            "protein": 0,
+                            "carbs": 0,
+                            "fats": 0
+                        }
+                        Make sure calories, protein, carbs, and fats are integer numbers only.
+                        """
+
+                        response = client.chat.completions.create(
+                            model="llama-3.2-11b-vision-preview",
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": prompt_instruction},
+                                        {
+                                            "type": "image_url",
+                                            "image_url": {
+                                                "url": f"data:image/jpeg;base64,{base64_image}"
+                                            },
+                                        },
+                                    ],
+                                }
+                            ],
+                            temperature=0.2
+                        )
+
+                        res_text = response.choices[0].message.content.strip()
+                        # تنظيف النص إذا أرجع الموديل أقواس كود
+                        if res_text.startswith("```"):
+                            res_text = res_text.split("```")[1]
+                            if res_text.startswith("json"):
+                                res_text = res_text[4:]
+                        res_text = res_text.strip()
+
+                        # تحويل النتيجة لـ JSON وتحديث العدادات فوق
+                        data = json.loads(res_text)
+                        
+                        st.session_state["meal_name"] = data.get("meal_name", "وجبة مشكلة")
+                        st.session_state["total_cals"] = int(data.get("calories", 0))
+                        st.session_state["total_protein"] = int(data.get("protein", 0))
+                        st.session_state["total_carbs"] = int(data.get("carbs", 0))
+                        st.session_state["total_fats"] = int(data.get("fats", 0))
+
+                        st.success("تم التحليل وتحديث العداد فوق بنجاح! 🎉")
+                        st.rerun()
+
+                    except Exception as e:
+                        st.error(f"حدث خطأ أثناء التحليل: {e}")
+
+    st.markdown("---")
+
+    # 3. قسم المساعد التغذوي الذكي
     st.subheader("💬 2. المساعد التغذوي الذكي")
-    user_question = st.text_input("اسأل أي سؤال تغذوي (مثال: احسب لي سعرات 200 جرام صدر دجاج وأرز):")
+    user_question = st.text_input("اسأل أي سؤال تغذوي إضافي:")
     
     if user_question:
         if not API_KEY:
