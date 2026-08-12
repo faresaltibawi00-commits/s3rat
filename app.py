@@ -365,7 +365,7 @@ else:
                     st.success(f"تمت إضافة الوجبة إلى {meal_type}!")
                     st.rerun()
 
-        # --- 5. ماسح الوجبة بالذكاء الاصطناعي (الموديل المعتمد الجديد) ---
+        # --- 5. ماسح الوجبة بالذكاء الاصطناعي مع تحسين رسالة الخطأ ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:20px;">📸 مسح وتصوير الوجبة بالذكاء الاصطناعي</h3>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader("التقط صورة الوجبة لتحديث العداد تلقائياً:", type=["jpg", "jpeg", "png"])
         
@@ -397,9 +397,9 @@ else:
                             Values for calories, protein, carbs, fats must be integers only.
                             """
 
-                            # الموديل النشط والمعتمد حالياً للرؤية من Groq
+                            # تجربة استدعاء الموديل
                             response = client.chat.completions.create(
-                                model="llama-3.2-11b-vision-instruct",
+                                model="llama-3.2-11b-vision-preview",
                                 messages=[
                                     {
                                         "role": "user",
@@ -417,7 +417,6 @@ else:
 
                             res_text = response.choices[0].message.content.strip()
                             
-                            # تنظيف الاستجابة لضمان تحويلها لـ JSON بنجاح
                             if "{" in res_text and "}" in res_text:
                                 res_text = res_text[res_text.find("{"):res_text.rfind("}")+1]
 
@@ -437,8 +436,9 @@ else:
                             st.success(f"تم التعرف على {data.get('meal_name', 'الوجبة')} وإضافة (+{c_add} سعرة حرارية) بنجاح! 🎉")
                             st.rerun()
 
-                        except Exception as e:
-                            st.error(f"حدث خطأ أثناء قراءة الصورة: {e}. يرجى محاولة تصوير الوجبة بشكل أوضح.")
+                        except Exception:
+                            # الاستبدال المباشر لرسالة الخطأ الطويلة
+                            st.error("يرجى التصوير بشكل واضح")
 
         # --- 6. المساعد التغذوي الذكي المباشر ---
         st.markdown('<h3 style="color:#ffffff; font-size:20px; font-weight:800; margin-top:25px;">💬 المساعد التغذوي الذكي</h3>', unsafe_allow_html=True)
@@ -459,5 +459,5 @@ else:
                                 model="llama-3.3-70b-versatile",
                             )
                             st.info(chat_completion.choices[0].message.content)
-                        except Exception as e:
-                            st.error(f"حدث خطأ: {e}")
+                        except Exception:
+                            st.error("حدث خطأ أثناء التواصل مع المساعد الذكي.")
