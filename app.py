@@ -4,7 +4,7 @@ from PIL import Image
 
 # 1. إعدادات الصفحة
 st.set_page_config(
-    page_title="FitAI | حاسبة وتتبع السعرات",
+    page_title="fares s3rat",
     page_icon="🥗",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -33,16 +33,22 @@ st.markdown("""
     
     .main-header {
         background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        padding: 20px;
+        padding: 25px;
         border-radius: 15px;
         color: white;
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 25px;
     }
     .main-header h1 {
         color: white !important;
-        font-size: 24px;
+        font-size: 32px;
+        font-weight: 700;
         margin: 0;
+    }
+    .main-header p {
+        font-size: 16px;
+        margin-top: 5px;
+        opacity: 0.9;
     }
     .metric-card {
         background-color: #f8f9fa;
@@ -68,8 +74,8 @@ st.markdown("""
 if not st.session_state["logged_in"]:
     st.markdown("""
         <div class="main-header">
-            <h1>🔐 تسجيل الدخول إلى FitAI</h1>
-            <p>يرجى تسجيل الدخول للوصول لحاسبة السعرات والذكاء الاصطناعي</p>
+            <h1>🥗 fares s3rat</h1>
+            <p>مرحباً بك! يرجى تسجيل الدخول للوصول للحاسبة والذكاء الاصطناعي</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -77,7 +83,7 @@ if not st.session_state["logged_in"]:
     with col2:
         username = st.text_input("اسم المستخدم:")
         password = st.text_input("كلمة المرور:", type="password")
-        login_btn = st.button("تسجيل الدخول 🚀")
+        login_btn = st.button("تسجيل الدخول 🚀", use_container_width=True)
         
         if login_btn:
             if username == "user" and password == "1234":
@@ -85,14 +91,14 @@ if not st.session_state["logged_in"]:
                 st.success("تم تسجيل الدخول بنجاح!")
                 st.rerun()
             else:
-                st.error("اسم المستخدم أو كلمة المرور غير صحيحة! (الافتراضي: user / 1234)")
+                st.error("اسم المستخدم أو كلمة المرور غير صحيحة!")
 
 else:
     # --- التطبيق الرئيسي ---
     st.markdown("""
         <div class="main-header">
-            <h1>🥗 FitAI — رفيقك التغذوي الذكي</h1>
-            <p>احسب احتياجك اليومي، صور وجبتك بالذكاء الاصطناعي، وتتبع سعراتك!</p>
+            <h1>🥗 fares s3rat</h1>
+            <p>حاسبة السعرات الحرارية وتحليل الوجبات بالذكاء الاصطناعي</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -157,7 +163,7 @@ else:
         
         if st.button("✨ تحليل الوجبة وحساب السعرات بدقة"):
             if not API_KEY:
-                st.error("⚠️ لم يتم ضبط مفتاح Gemini API Key في إعدادات Streamlit Secrets.")
+                st.error("⚠️ لم يتم ضبط مفتاح Gemini API Key في Streamlit Secrets.")
             else:
                 with st.spinner("جاري تحليل الوجبة... ⏳"):
                     client = genai.Client(api_key=API_KEY)
@@ -189,7 +195,7 @@ else:
     user_question = st.text_input("اسأل أي سؤال تغذوي:")
     if user_question:
         if not API_KEY:
-            st.error("⚠️ لم يتم ضبط مفتاح Gemini API Key في إعدادات Streamlit Secrets.")
+            st.error("⚠️ لم يتم ضبط مفتاح Gemini API Key في Streamlit Secrets.")
         else:
             with st.spinner("جاري الإجابة..."):
                 try:
