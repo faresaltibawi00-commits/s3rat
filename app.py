@@ -1,8 +1,5 @@
 import streamlit as st
-import requests
-import base64
-from PIL import Image
-import io
+from groq import Groq
 
 # 1. إعدادات الصفحة
 st.set_page_config(
@@ -12,10 +9,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. جلب المفتاح تلقائياً من Secrets
+# 2. جلب مفتاح Groq من Secrets
 API_KEY = None
-if "GEMINI_API_KEY" in st.secrets:
-    API_KEY = str(st.secrets["GEMINI_API_KEY"]).strip()
+if "GROQ_API_KEY" in st.secrets:
+    API_KEY = str(st.secrets["GROQ_API_KEY"]).strip()
 
 # 3. إدارة جلسة المستخدم
 if "logged_in" not in st.session_state:
@@ -24,7 +21,7 @@ if "logged_in" not in st.session_state:
 if "users_db" not in st.session_state:
     st.session_state["users_db"] = {"user": "1234"}
 
-# 4. التنسيق
+# 4. التصميم والتنسيق
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -80,48 +77,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# دالة التعامل مع الـ API (تدعم المفاتيح القديمة والجديدة AQ)
-def query_gemini(prompt, image=None):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-    
-    headers = {"Content-Type": "application/json"}
-    
-    # التعامل مع نوع المفتاح
-    if API_KEY.startswith("AQ"):
-        headers["Authorization"] = f"Bearer {API_KEY}"
-        request_url = url
-    else:
-        request_url = f"{url}?key={API_KEY}"
-
-    contents_parts = []
-    
-    if image is not None:
-        buffered = io.BytesIO()
-        image.save(buffered, format="JPEG")
-        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-        contents_parts.append({
-            "inline_data": {
-                "mime_type": "image/jpeg",
-                "data": img_str
-            }
-        })
-        
-    contents_parts.append({"text": prompt})
-    
-    payload = {
-        "contents": [{
-            "parts": contents_parts
-        }]
-    }
-
-    res = requests.post(request_url, json=payload, headers=headers)
-    if res.status_code == 200:
-        data = res.json()
-        return data['candidates'][0]['content']['parts'][0]['text']
-    else:
-        raise Exception(f"خطأ ({res.status_code}): {res.text}")
-
-# --- شاشة الدخول والتسجيل ---
+# --- شاشة تسجيل الدخول وإنشاء الحساب ---
 if not st.session_state["logged_in"]:
     st.markdown("""
         <div class="hero-banner">
@@ -167,7 +123,7 @@ if not st.session_state["logged_in"]:
                     st.rerun()
 
 else:
-    # --- التطبيق الرئيسي ---
+    # --- الواجهة الرئيسية للبرنامج ---
     col_h1, col_h2 = st.columns([5, 1])
     with col_h2:
         if st.button("تسجيل الخروج 🚪"):
@@ -177,11 +133,11 @@ else:
     st.markdown("""
         <div class="main-header">
             <h1>🥗 faress3rat</h1>
-            <p>حاسبة السعرات الحرارية وتحليل الوجبات بالذكاء الاصطناعي</p>
+            <p>حاسبة السعرات الحرارية والمساعد التغذوي الذكي</p>
         </div>
     """, unsafe_allow_html=True)
 
-    # 1. حساب الاحتياج اليومي
+    # 1. قسم حساب السعرات الاحتياج اليومي
     st.subheader("📊 1. حساب الاحتياج اليومي (TDEE)")
     
     col_c1, col_c2 = st.columns(2)
@@ -224,41 +180,30 @@ else:
 
     st.markdown("---")
 
-    # 2. تحليل الوجبة بالذكاء الاصطناعي
-    st.subheader("📸 2. تحليل الوجبة بالذكاء الاصطناعي")
-
-    uploaded_file = st.file_uploader("ارفع صورة الوجبة هنا...", type=["jpg", "jpeg", "png"])
+    # 2. قسم المساعد التغذوي الذكي
+    st.subheader("💬 2. المساعد التغذوي الذكي")
+    user_question = st.text_input("اسأل أي سؤال تغذوي (مثال: احسب لي سعرات 200 جرام صدر دجاج وأرز):")
     
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="الوجبة المرفوعة", use_container_width=True)
-        
-        if st.button("✨ تحليل الوجبة وحساب السعرات بدقة"):
-            if not API_KEY:
-                st.error("⚠️ لم يتم ضبط مفتاح Gemini API Key في Streamlit Secrets.")
-            else:
-                with st.spinner("جاري تحليل الوجبة... ⏳"):
-                    try:
-                        prompt = "أنت أخصائي تغذية خبير ومحترف. قم بتحليل الوجبة في الصورة بدقة باللغة العربية واذكر السعرات والماكروز والتفاصيل."
-                        ans = query_gemini(prompt, image)
-                        st.success("تم التحليل بنجاح! 🎉")
-                        st.markdown(ans)
-                    except Exception as e:
-                        st.error(f"حدث خطأ أثناء التحليل: {e}")
-
-    st.markdown("---")
-
-    # 3. المساعد الذكي
-    st.subheader("💬 3. المساعد التغذوي الذكي")
-    user_question = st.text_input("اسأل أي سؤال تغذوي:")
     if user_question:
         if not API_KEY:
-            st.error("⚠️ لم يتم ضبط مفتاح Gemini API Key في Streamlit Secrets.")
+            st.error("⚠️ لم يتم ضبط GROQ_API_KEY في Streamlit Secrets.")
         else:
-            with st.spinner("جاري الإجابة..."):
+            with st.spinner("جاري الإجابة... ⚡"):
                 try:
-                    chat_prompt = f"أجب كأخصائي تغذية بأسلوب مشجع ومختصر باللغة العربية على السؤال التالي: {user_question}"
-                    ans = query_gemini(chat_prompt)
-                    st.info(ans)
+                    client = Groq(api_key=API_KEY)
+                    chat_completion = client.chat.completions.create(
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "أنت خبير تغذية محترف ومساعد ذكي. أجب باللغة العربية بدقة وبشكل مبهج ومختصر."
+                            },
+                            {
+                                "role": "user",
+                                "content": user_question,
+                            }
+                        ],
+                        model="llama-3.3-70b-versatile",
+                    )
+                    st.info(chat_completion.choices[0].message.content)
                 except Exception as e:
                     st.error(f"حدث خطأ: {e}")
