@@ -16,11 +16,15 @@ try:
 except Exception:
     API_KEY = None
 
-# 3. نظام تسجيل الدخول
+# 3. إدارة جلسة المستخدم والحسابات المحفوظة
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
-# 4. تحسين المظهر والتنسيق
+if "users_db" not in st.session_state:
+    # حساب افتراضي للتجربة
+    st.session_state["users_db"] = {"user": "1234"}
+
+# 4. تحسين المظهر والتنسيق (CSS)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -31,9 +35,36 @@ st.markdown("""
         text-align: right;
     }
     
+    /* الشريط المخصص لشاشة الدخول */
+    .hero-banner {
+        background: linear-gradient(135deg, #0ba360 0%, #3cba92 100%);
+        padding: 35px 20px;
+        border-radius: 18px;
+        color: white;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .hero-banner h1 {
+        color: white !important;
+        font-size: 36px;
+        font-weight: 700;
+        margin: 0;
+    }
+    .hero-banner .sub-title {
+        font-size: 20px;
+        font-weight: bold;
+        background-color: rgba(255, 255, 255, 0.2);
+        display: inline-block;
+        padding: 6px 20px;
+        border-radius: 20px;
+        margin-top: 12px;
+    }
+    
+    /* هيدر التطبيق الرئيسي */
     .main-header {
         background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        padding: 25px;
+        padding: 20px;
         border-radius: 15px;
         color: white;
         text-align: center;
@@ -41,15 +72,10 @@ st.markdown("""
     }
     .main-header h1 {
         color: white !important;
-        font-size: 32px;
-        font-weight: 700;
+        font-size: 28px;
         margin: 0;
     }
-    .main-header p {
-        font-size: 16px;
-        margin-top: 5px;
-        opacity: 0.9;
-    }
+    
     .metric-card {
         background-color: #f8f9fa;
         border-radius: 12px;
@@ -70,31 +96,57 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- شاشة تسجيل الدخول ---
+# --- شاشة التسجيل / الدخول (قبل الدخول) ---
 if not st.session_state["logged_in"]:
+    # الشريط الوردي/الخاطف للانتباه بكتابة "خيارك الأنسب"
     st.markdown("""
-        <div class="main-header">
+        <div class="hero-banner">
             <h1>🥗 fares s3rat</h1>
-            <p>مرحباً بك! يرجى تسجيل الدخول للوصول للحاسبة والذكاء الاصطناعي</p>
+            <div class="sub-title">✨ خيارك الأنسب ✨</div>
         </div>
     """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        username = st.text_input("اسم المستخدم:")
-        password = st.text_input("كلمة المرور:", type="password")
-        login_btn = st.button("تسجيل الدخول 🚀", use_container_width=True)
+        tab_login, tab_signup = st.tabs(["🔐 تسجيل الدخول", "✨ إنشاء حساب جديد"])
         
-        if login_btn:
-            if username == "user" and password == "1234":
-                st.session_state["logged_in"] = True
-                st.success("تم تسجيل الدخول بنجاح!")
-                st.rerun()
-            else:
-                st.error("اسم المستخدم أو كلمة المرور غير صحيحة!")
+        # --- تبويب تسجيل الدخول ---
+        with tab_login:
+            st.write(" ")
+            login_user = st.text_input("اسم المستخدم:", key="login_u")
+            login_pass = st.text_input("كلمة المرور:", type="password", key="login_p")
+            
+            if st.button("تسجيل الدخول 🚀", use_container_width=True):
+                if login_user in st.session_state["users_db"] and st.session_state["users_db"][login_user] == login_pass:
+                    st.session_state["logged_in"] = True
+                    st.success("تم تسجيل الدخول بنجاح!")
+                    st.rerun()
+                else:
+                    st.error("اسم المستخدم أو كلمة المرور غير صحيحة!")
+
+        # --- تبويب إنشاء حساب جديد ---
+        with tab_signup:
+            st.write(" ")
+            new_user = st.text_input("اختر اسم المستخدم:", key="signup_u")
+            new_pass = st.text_input("اختر كلمة المرور:", type="password", key="signup_p")
+            confirm_pass = st.text_input("تأكيد كلمة المرور:", type="password", key="signup_cp")
+            
+            if st.button("إنشاء الحساب والدخول فوراً 🎯", use_container_width=True):
+                if not new_user or not new_pass:
+                    st.warning("يرجى ملء جميع الحقول!")
+                elif new_user in st.session_state["users_db"]:
+                    st.error("اسم المستخدم هذا مستخدم بالفعل، اختر اسماً آخر.")
+                elif new_pass != confirm_pass:
+                    st.error("كلمتا المرور غير متطابقتين!")
+                else:
+                    # حفظ الحساب وتوقيع الدخول فوراً
+                    st.session_state["users_db"][new_user] = new_pass
+                    st.session_state["logged_in"] = True
+                    st.success("تم إنشاء الحساب بنجاح!")
+                    st.rerun()
 
 else:
-    # --- التطبيق الرئيسي ---
+    # --- التطبيق الرئيسي (بعد الدخول - يختفي الشريط الترحيبي تلقائياً) ---
     st.markdown("""
         <div class="main-header">
             <h1>🥗 fares s3rat</h1>
